@@ -2,8 +2,9 @@
 // Copyright 2018 the Deno authors. All rights reserved. MIT license.
 // Originated from source-map-support but has been heavily modified for deno.
 import { SourceMapConsumer, MappedPosition } from "source-map";
+import { RawSourceMap } from "source-map";
 import * as base64 from "base64-js";
-import { arrayToStr } from "./util";
+import { assert, arrayToStr } from "./util";
 
 const consumers = new Map<string, SourceMapConsumer>();
 
@@ -24,7 +25,7 @@ interface Position {
   line: number;
 }
 
-type GetGeneratedContentsCallback = (fileName: string) => string;
+type GetGeneratedContentsCallback = (fileName: string) => string | RawSourceMap;
 
 let getGeneratedContents: GetGeneratedContentsCallback;
 
@@ -186,17 +187,19 @@ const reSourceMap = /^data:application\/json[^,]+base64,/;
 function loadConsumer(source: string): SourceMapConsumer {
   let consumer = consumers.get(source);
   if (consumer == null) {
-    const code = getGeneratedContents(source);
+    let code = getGeneratedContents(source);
     if (!code) {
       return null;
     }
+    assert(typeof code === "string");
+    code = code as string;
 
     let sourceMappingURL = retrieveSourceMapURL(code);
     if (!sourceMappingURL) {
       throw Error("No source map?");
     }
 
-    let sourceMapData: string;
+    let sourceMapData: string | RawSourceMap;
     if (reSourceMap.test(sourceMappingURL)) {
       // Support source map URL as a data url
       const rawData = sourceMappingURL.slice(sourceMappingURL.indexOf(",") + 1);
@@ -209,8 +212,11 @@ function loadConsumer(source: string): SourceMapConsumer {
       sourceMapData = getGeneratedContents(sourceMappingURL);
     }
 
+    const rawSourceMap =
+      typeof sourceMapData === "string"
+        ? JSON.parse(sourceMapData)
+        : sourceMapData;
     //console.log("sourceMapData", sourceMapData);
-    const rawSourceMap = JSON.parse(sourceMapData);
     consumer = new SourceMapConsumer(rawSourceMap);
     consumers.set(source, consumer);
   }

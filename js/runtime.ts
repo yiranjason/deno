@@ -12,7 +12,7 @@ import * as util from "./util";
 import { log } from "./util";
 import { assetSourceCode } from "./assets";
 import * as os from "./os";
-//import * as sourceMaps from "./v8_source_maps";
+import * as sourceMaps from "./v8_source_maps";
 import { window, globalEval } from "./globals";
 //import * as deno from "./deno";
 
@@ -39,15 +39,28 @@ window.onerror = (
   os.exit(1);
 };
 
-/*
-export function setup(mainJs: string, mainMap: string): void {
+// This is called during snapshot creation with the contents of
+// out/debug/gen/bundle/main.js.map.
+import { RawSourceMap } from "source-map";
+let mainSourceMap: RawSourceMap = null;
+function setMainSourceMap(rawSourceMap: RawSourceMap) {
+  util.assert(Number(rawSourceMap.version) === 3);
+  mainSourceMap = rawSourceMap;
+}
+window["setMainSourceMap"] = setMainSourceMap;
+
+export function setup(): void {
   sourceMaps.install({
     installPrepareStackTrace: true,
-    getGeneratedContents: (filename: string): string => {
+    getGeneratedContents: (filename: string): string | RawSourceMap => {
       if (filename === "/main.js") {
-        return mainJs;
+        util.assert(false, "getGeneratedContents main.js");
+        return null;
       } else if (filename === "/main.map") {
-        return mainMap;
+        util.assert(false, "getGeneratedContents main.js.map");
+        return null;
+      } else if (filename === "/main.js.map") {
+        return mainSourceMap;
       } else {
         const mod = FileModule.load(filename);
         if (!mod) {
@@ -58,7 +71,6 @@ export function setup(mainJs: string, mainMap: string): void {
     }
   });
 }
-*/
 
 // This class represents a module. We call it FileModule to make it explicit
 // that each module represents a single file.

@@ -13,6 +13,11 @@
 
 namespace deno {
 
+Deno* FromIsolate(v8::Isolate* isolate) {
+  return static_cast<Deno*>(isolate->GetData(0));
+}
+
+
 // Extracts a C string from a v8::V8 Utf8Value.
 const char* ToCString(const v8::String::Utf8Value& value) {
   return *value ? *value : "<string conversion failed>";
@@ -27,7 +32,7 @@ static inline v8::Local<v8::String> v8_str(const char* x) {
 void HandleException(v8::Local<v8::Context> context,
                      v8::Local<v8::Value> exception) {
   auto* isolate = context->GetIsolate();
-  Deno* d = static_cast<Deno*>(isolate->GetData(0));
+  Deno* d = FromIsolate(isolate);
   v8::HandleScope handle_scope(isolate);
   v8::Context::Scope context_scope(context);
 
@@ -239,7 +244,8 @@ bool Execute(v8::Local<v8::Context> context, const char* js_filename,
 }
 
 void InitializeContext(v8::Isolate* isolate, v8::Local<v8::Context> context,
-                       const char* js_filename, const char* js_source) {
+                       const char* js_filename, const std::string& js_source,
+                       const std::string* source_map) {
   v8::HandleScope handle_scope(isolate);
   v8::Context::Scope context_scope(context);
 
@@ -260,8 +266,22 @@ void InitializeContext(v8::Isolate* isolate, v8::Local<v8::Context> context,
   auto send_val = send_tmpl->GetFunction(context).ToLocalChecked();
   CHECK(deno_val->Set(context, deno::v8_str("send"), send_val).FromJust());
 
-  bool r = Execute(context, js_filename, js_source);
-  CHECK(r);
+  printf("InitializeContext \n");
+  bool r = Execute(context, js_filename, js_source.c_str());
+  printf("InitializeContext after execute %d\n", r);
+  if (!r) {
+    auto exception = deno_last_exception(FromIsolate(isolate));
+    printf("InitializeContext exception: %s\n", exception);
+    CHECK(false);
+  }
+
+  if (source_map != nullptr) {
+    CHECK_GT(source_map->length(), 1u);
+    std::string set_source_map = "setMainSourceMap( " + *source_map + " )";
+    CHECK_GT(set_source_map.length(), source_map->length());
+    r = Execute(context, "set_source_map.js", set_source_map.c_str());
+    CHECK(r);
+  }
 }
 
 void AddIsolate(Deno* d, v8::Isolate* isolate) {
