@@ -53,18 +53,20 @@ export function setup(): void {
   sourceMaps.install({
     installPrepareStackTrace: true,
     getGeneratedContents: (filename: string): string | RawSourceMap => {
-      if (filename === "/main.js") {
-        util.assert(false, "getGeneratedContents main.js");
-        return null;
-      } else if (filename === "/main.map") {
-        util.assert(false, "getGeneratedContents main.js.map");
-        return null;
-      } else if (filename === "/main.js.map") {
+      //util.log("getGeneratedContents", filename);
+      if (filename === "gen/bundle/main.js") {
+        util.assert(window["mainSource"].length > 0);
+        //util.log("mainSource length", window["mainSource"].length)
+        return window["mainSource"];
+      } else if (filename === "main.js.map") {
         return mainSourceMap;
+      } else if (filename === "deno_main.js") {
+        return "";
       } else {
         const mod = FileModule.load(filename);
         if (!mod) {
-          console.error("getGeneratedContents cannot find", filename);
+          //util.log("getGeneratedContents cannot find", filename);
+          return null;
         }
         return mod.outputCode;
       }

@@ -10,12 +10,6 @@
 #include "deno.h"
 #include "internal.h"
 
-#ifdef DENO_MOCK_RUNTIME
-#include "snapshot_mock_runtime.cc"
-#else
-#include "snapshot_deno.cc"
-#endif
-
 namespace deno {
 
 std::vector<InternalFieldData*> deserialized_data;
@@ -42,7 +36,11 @@ Deno* NewFromSnapshot(void* data, deno_recv_cb cb) {
   params.array_buffer_allocator =
       v8::ArrayBuffer::Allocator::NewDefaultAllocator();
   params.external_references = external_references;
-  params.snapshot_blob = StartupBlob_snapshot();
+  CHECK_NE(&deno_snapshot_start, nullptr);
+  static v8::StartupData snapshot = {&deno_snapshot_start,
+                                     &deno_snapshot_end - &deno_snapshot_start};
+  // printf("deno_snapshot_start %p\n", &deno_snapshot_start);
+  params.snapshot_blob = &snapshot;
   v8::Isolate* isolate = v8::Isolate::New(params);
   AddIsolate(d, isolate);
 

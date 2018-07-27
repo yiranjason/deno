@@ -226,8 +226,9 @@ void Send(const v8::FunctionCallbackInfo<v8::Value>& args) {
   d->currentArgs = nullptr;
 }
 
-bool Execute(v8::Local<v8::Context> context, const char* js_filename,
-             const char* js_source) {
+bool ExecuteV8StringSource(v8::Local<v8::Context> context,
+                           const char* js_filename,
+                           v8::Local<v8::String> source) {
   auto* isolate = context->GetIsolate();
   v8::Isolate::Scope isolate_scope(isolate);
   v8::HandleScope handle_scope(isolate);
@@ -237,7 +238,6 @@ bool Execute(v8::Local<v8::Context> context, const char* js_filename,
   v8::TryCatch try_catch(isolate);
 
   auto name = v8_str(js_filename);
-  auto source = v8_str(js_source);
 
   v8::ScriptOrigin origin(name);
 
@@ -258,6 +258,15 @@ bool Execute(v8::Local<v8::Context> context, const char* js_filename,
   }
 
   return true;
+}
+
+bool Execute(v8::Local<v8::Context> context, const char* js_filename,
+             const char* js_source) {
+  auto* isolate = context->GetIsolate();
+  v8::Isolate::Scope isolate_scope(isolate);
+  v8::HandleScope handle_scope(isolate);
+  auto source = v8_str(js_source);
+  return ExecuteV8StringSource(context, js_filename, source);
 }
 
 void InitializeContext(v8::Isolate* isolate, v8::Local<v8::Context> context,
@@ -284,22 +293,20 @@ void InitializeContext(v8::Isolate* isolate, v8::Local<v8::Context> context,
   CHECK(deno_val->Set(context, deno::v8_str("send"), send_val).FromJust());
 
   // bool r = Execute(context, js_filename, js_source.c_str());
-  v8::TryCatch try_catch(isolate);
   skip_onerror = true;
   {
-    deno::Execute(context, js_filename, js_source.c_str());
-    if (try_catch.HasCaught()) {
-      exit(1);
-    }
+    auto source = deno::v8_str(js_source.c_str());
+    CHECK(global->Set(context, deno::v8_str("mainSource"), source).FromJust());
+
+    bool r = deno::ExecuteV8StringSource(context, js_filename, source);
+    CHECK(r);
 
     if (source_map != nullptr) {
       CHECK_GT(source_map->length(), 1u);
       std::string set_source_map = "setMainSourceMap( " + *source_map + " )";
       CHECK_GT(set_source_map.length(), source_map->length());
-      deno::Execute(context, "set_source_map.js", set_source_map.c_str());
-      if (try_catch.HasCaught()) {
-        exit(2);
-      }
+      r = deno::Execute(context, "set_source_map.js", set_source_map.c_str());
+      CHECK(r);
     }
   }
   skip_onerror = false;

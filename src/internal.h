@@ -23,6 +23,10 @@ int deno_argc();
 struct deno_s* deno_from_isolate(v8::Isolate* isolate);
 }
 
+// Defined in snapshot.s
+extern const char deno_snapshot_start;
+extern const char deno_snapshot_end;
+
 namespace deno {
 
 struct InternalFieldData {
